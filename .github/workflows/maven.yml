@@ -41,7 +41,6 @@ jobs:
           ECS_USER: ${{ secrets.SERVER_USERNAME }}
           ECS_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
         run: |
-          chmod -R a+rw ${{ github.workspace }}/target
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
