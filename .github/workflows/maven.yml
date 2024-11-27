@@ -1,16 +1,17 @@
-name: CI/CD Pipeline
+name: kktree-backed
 
 on:
   push:
     branches:
-      - master
+      - main
   pull_request:
     branches:
-      - master
+      - main
 
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -21,28 +22,35 @@ jobs:
           java-version: '11'
           distribution: 'temurin'
 
-      - name: Build with Maven
+      # maven缓存
+      - name: maven缓存
+        uses: actions/cache@v3
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-maven-
+
+      - name: 构建maven
         run: mvn clean package -DskipTests
 
       - name: Deploy to ECS
         env:
           ECS_IP: ${{ secrets.SERVER_HOST }}
+          ECS_PORT: ${{ secrets.SSH_PORT }}
           ECS_USER: ${{ secrets.SERVER_USERNAME }}
           ECS_SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          ECS_PORT: ${{ secrets.SERVER_PORT }}
         run: |
+          chmod -R a+rw ${{ github.workspace }}/target
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          
-          # 将生成的 ruoyi-admin.jar 部署到指定服务器路径
-          sudo scp -P ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no ruoyi-admin/target/ruoyi-admin.jar ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:/usr/local/javaProject/kktree-backed/ruoyi-admin.jar
+          scp -P ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no ruoyi-admin/target/ruoyi-admin.jar ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:/usr/local/javaProject/kktree-backed/ruoyi-admin.jar
 
-          # SSH 连接到服务器，重启应用
-          ssh -p ${{ secrets.SERVER_PORT }} -o StrictHostKeyChecking=no ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} << 'EOF'
+          ssh -P ${{ secrets.SSH_PORT }} -o StrictHostKeyChecking=no ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} << 'EOF'
             # 检查是否有正在运行的 init-backed.jar，如果有则停止它
             if pgrep -f "java.*ruoyi-admin.jar"; then
-              pkill -f "java.*ruoyi-admin.jar"
+               pkill -f "java.*ruoyi-admin.jar"
             fi
             # 启动新的 ruoyi-admin.jar
             nohup java -jar /usr/local/javaProject/kktree-backed/ruoyi-admin.jar > /usr/local/javaProject/kktree-backed/app.log 2>&1 &
