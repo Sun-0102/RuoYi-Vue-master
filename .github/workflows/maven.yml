@@ -21,6 +21,7 @@ jobs:
         with:
           java-version: '11'
           distribution: 'temurin'
+
       - name: maven缓存
         uses: actions/cache@v3
         with:
@@ -32,6 +33,13 @@ jobs:
       - name: 构建maven
         run: mvn clean package -DskipTests
 
+      - name: Check if jar file exists
+        run: |
+          if [ -f "ruoyi-admin/target/ruoyi-admin.jar" ]; then
+            echo "Jar file exists."
+          else
+            echo "Jar file does not exist!" && exit 1
+          fi
       - name: Deploy to ECS
         env:
           ECS_IP: ${{ secrets.SERVER_HOST }}
@@ -42,7 +50,7 @@ jobs:
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_ed25519
           chmod 600 ~/.ssh/id_ed25519
-          scp -o StrictHostKeyChecking=no -P ${{ secrets.SSH_PORT }} ruoyi-admin/target/ruoyi-admin.jar ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:/usr/local/javaProject/kktree-backed/ruoyi-admin.jar
+          scp -o StrictHostKeyChecking=no -P ${{ secrets.SSH_PORT }} $(pwd)/ruoyi-admin/target/ruoyi-admin.jar ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }}:/usr/local/javaProject/kktree-backed/ruoyi-admin.jar
           ssh -o StrictHostKeyChecking=no -p ${{ secrets.SSH_PORT }} ${{ secrets.SERVER_USERNAME }}@${{ secrets.SERVER_HOST }} << 'EOF'
             # 检查是否有正在运行的 init-backed.jar，如果有则停止它
             if pgrep -f "java.*ruoyi-admin.jar"; then
